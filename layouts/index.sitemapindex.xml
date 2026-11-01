@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap><loc>{{ "sitemap-tools.xml" | absURL }}</loc></sitemap>
+  <sitemap><loc>{{ "sitemap-hardware.xml" | absURL }}</loc></sitemap>
+  <sitemap><loc>{{ "sitemap-models.xml" | absURL }}</loc></sitemap>
+  <sitemap><loc>{{ "sitemap-skills.xml" | absURL }}</loc></sitemap>
+  <sitemap><loc>{{ "sitemap-pages.xml" | absURL }}</loc></sitemap>
+</sitemapindex>

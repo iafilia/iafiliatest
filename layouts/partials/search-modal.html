@@ -1,0 +1,173 @@
+<div id="search-modal" class="search-modal" hidden>
+  <div class="search-modal__backdrop" id="search-backdrop"></div>
+  <div class="search-modal__box">
+    <div class="search-modal__header">
+      <span class="search-modal__title">Best of <span style="color:var(--accent)">AI</span></span>
+      <button class="search-modal__close" id="search-close" aria-label="Close search"><kbd>esc</kbd></button>
+    </div>
+    <div class="search-modal__input-wrap">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color:var(--fg-muted);flex-shrink:0"><circle cx="11" cy="11" r="8"/><path d="m21 21-3.5-3.5"/></svg>
+      <input type="text" id="search-input" class="search-modal__input" placeholder="Search tools and professions..." autocomplete="off" spellcheck="false">
+    </div>
+    <div id="search-results" class="search-results" role="listbox"></div>
+    <div class="search-modal__footer">
+      <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
+      <span><kbd>↵</kbd> open</span>
+      <span><kbd>esc</kbd> close</span>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var index    = null;
+  var selected = -1;
+  var modal    = document.getElementById('search-modal');
+  var input    = document.getElementById('search-input');
+  var results  = document.getElementById('search-results');
+  var openBtn  = document.getElementById('search-open');
+  var closeBtn = document.getElementById('search-close');
+  var backdrop = document.getElementById('search-backdrop');
+
+  function openSearch() {
+    modal.removeAttribute('hidden');
+    document.body.classList.add('search-open');
+    input.focus();
+    if (!index) loadIndex();
+  }
+
+  function closeSearch() {
+    modal.setAttribute('hidden', '');
+    document.body.classList.remove('search-open');
+    input.value = '';
+    results.innerHTML = '';
+    selected = -1;
+  }
+
+  function loadIndex() {
+    fetch('{{ "/index.json" | relURL }}')
+      .then(function(r) { return r.json(); })
+      .then(function(d) { index = d; })
+      .catch(function() { index = []; });
+  }
+
+  function esc(s) {
+    return s.replace(/[&<>"']/g, function(c) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+
+  function hi(text, q) {
+    if (!q) return esc(text);
+    var re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + ')', 'gi');
+    return esc(text).replace(re, '<mark>$1</mark>');
+  }
+
+  function scoreItem(it, ql) {
+    var name  = (it.name || '').toLowerCase();
+    var title = (it.title || '').toLowerCase();
+    var desc  = (it.description || '').toLowerCase();
+    var cat   = (it.category || '').toLowerCase();
+    if (name === ql || title === ql)                   return 4;
+    if (name.startsWith(ql) || title.startsWith(ql))  return 3;
+    if (name.includes(ql)  || title.includes(ql))     return 2;
+    if (desc.includes(ql))                             return 1;
+    if (cat.includes(ql))                              return 1;
+    return 0;
+  }
+
+  function renderItem(it, q) {
+    var desc = it.description ? it.description.slice(0, 80) : '';
+    return '<a href="' + esc(it.url) + '" class="search-result" role="option" tabindex="-1">'
+      + '<span class="sr-cat">' + esc(it.category || '') + '</span>'
+      + '<span class="sr-body">'
+      +   '<span class="sr-name">' + hi(it.name || it.slug, q) + '</span>'
+      +   (desc ? '<span class="sr-desc">' + hi(desc, q) + '</span>' : '')
+      + '</span>'
+      + (it.price && it.price !== 'Free' ? '<span class="badge badge-' + it.price.toLowerCase() + '">' + esc(it.price) + '</span>' : '')
+      + '</a>';
+  }
+
+  function doSearch(q) {
+    selected = -1;
+    if (!q || q.length < 2 || !index) { results.innerHTML = ''; return; }
+    var ql = q.toLowerCase();
+    var groups = { profession: [], category: [], tag: [], company: [], hardware: [], tool: [] };
+    for (var i = 0; i < index.length; i++) {
+      var it    = index[i];
+      var type  = it.type || 'tool';
+      var score = scoreItem(it, ql);
+      if (score > 0 && groups[type]) groups[type].push({ it: it, score: score });
+    }
+    Object.keys(groups).forEach(function(k) {
+      groups[k].sort(function(a,b){ return b.score - a.score; });
+    });
+    var profs     = groups.profession.slice(0, 3);
+    var cats      = groups.category.slice(0, 3).concat(groups.tag.slice(0, 3));
+    cats.sort(function(a,b){ return b.score - a.score; });
+    cats = cats.slice(0, 4);
+    var companies = groups.company.slice(0, 4);
+    var hardware  = groups.hardware.slice(0, 4);
+    var tools     = groups.tool.slice(0, 8);
+    var total = profs.length + cats.length + companies.length + hardware.length + tools.length;
+    if (!total) {
+      results.innerHTML = '<div class="search-empty">No results for <strong>' + esc(q) + '</strong></div>';
+      return;
+    }
+    var html = '';
+    if (profs.length) {
+      html += '<div class="sr-group-label">Professions</div>';
+      profs.forEach(function(r){ html += renderItem(r.it, q); });
+    }
+    if (cats.length) {
+      html += '<div class="sr-group-label">Categories &amp; Tags</div>';
+      cats.forEach(function(r){ html += renderItem(r.it, q); });
+    }
+    if (companies.length) {
+      html += '<div class="sr-group-label">Companies</div>';
+      companies.forEach(function(r){ html += renderItem(r.it, q); });
+    }
+    if (hardware.length) {
+      html += '<div class="sr-group-label">Hardware</div>';
+      hardware.forEach(function(r){ html += renderItem(r.it, q); });
+    }
+    if (tools.length) {
+      html += '<div class="sr-group-label">Tools</div>';
+      tools.forEach(function(r){ html += renderItem(r.it, q); });
+    }
+    results.innerHTML = html;
+  }
+
+  function getItems() { return results.querySelectorAll('.search-result'); }
+
+  function setSel(n) {
+    var items = getItems();
+    if (!items.length) return;
+    if (selected >= 0 && selected < items.length) items[selected].classList.remove('is-selected');
+    selected = Math.max(0, Math.min(n, items.length - 1));
+    items[selected].classList.add('is-selected');
+    items[selected].scrollIntoView({ block: 'nearest' });
+  }
+
+  input.addEventListener('input', function() { doSearch(input.value.trim()); });
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setSel(selected + 1); }
+    if (e.key === 'ArrowUp')   { e.preventDefault(); setSel(selected - 1); }
+    if (e.key === 'Enter' && selected >= 0) { e.preventDefault(); getItems()[selected]?.click(); }
+  });
+  results.addEventListener('click', function(e) {
+    if (e.target.closest('.search-result')) closeSearch();
+  });
+
+  openBtn.addEventListener('click', openSearch);
+  closeBtn.addEventListener('click', closeSearch);
+  backdrop.addEventListener('click', closeSearch);
+  document.addEventListener('keydown', function(e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      modal.hasAttribute('hidden') ? openSearch() : closeSearch();
+    }
+    if (e.key === 'Escape' && !modal.hasAttribute('hidden')) closeSearch();
+  });
+})();
+</script>

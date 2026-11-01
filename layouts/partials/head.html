@@ -1,0 +1,341 @@
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+{{ $is404    := hasPrefix (lower .Title) "404" }}
+{{ $isSaved  := eq .Params.layout "saved" }}
+{{ $isTool    := and .IsPage (eq .Section "tools") }}
+{{ $isCompany := and .IsPage (eq .Section "companies") }}
+{{ $isHardware := and .IsPage (eq .Section "hardware") }}
+{{ $isModel   := and .IsPage (eq .Section "models") }}
+{{ $isModelCategory := and .IsPage (eq .Section "model-categories") }}
+{{ $isJournal := eq .Section "journal" }}
+{{ $isFree   := eq .RelPermalink "/free/" }}
+{{ $isSubmit := eq .RelPermalink "/submit/" }}
+{{ $name     := or .Params.name .Title }}
+{{ $siteURL  := .Site.BaseURL | strings.TrimRight "/" }}
+{{ $ogImageDefault := printf "%s/img/preview.png" $siteURL }}
+
+{{/* ── Hardware manufacturer lookup ── */}}
+{{ $hwManufacturerName := "" }}
+{{ if and $isHardware .Params.manufacturer }}
+  {{ $hwMatch := where (where .Site.RegularPages "Section" "companies") "Params.slug" .Params.manufacturer }}
+  {{ if $hwMatch }}{{ $hwManufacturerName = (index $hwMatch 0).Params.name }}{{ end }}
+{{ end }}
+
+{{/* ── Model category count (primary model_type ∪ extra_model_types, or runs_at_home) ── */}}
+{{ $modelCatCount := 0 }}
+{{ if $isModelCategory }}
+  {{ $allModels := where .Site.RegularPages "Section" "models" }}
+  {{ if eq .Params.filter_field "runs_at_home" }}
+    {{ $modelCatCount = len (where $allModels "Params.runs_at_home" true) }}
+  {{ else }}
+    {{ $mcPrimary := where $allModels "Params.model_type" .Params.filter_value }}
+    {{ $mcExtra   := where $allModels "Params.extra_model_types" "intersect" (slice .Params.filter_value) }}
+    {{ $modelCatCount = len (union $mcPrimary $mcExtra) }}
+  {{ end }}
+{{ end }}
+
+{{/* ── Robots ── */}}
+{{ if or $is404 $isSaved }}
+<meta name="robots" content="noindex, nofollow">
+{{ else }}
+<meta name="robots" content="index, follow">
+{{ end }}
+
+{{/* ── Page title ── */}}
+{{ $pageTitle := "" }}
+{{ if .IsHome }}
+  {{ $pageTitle = "Best of AI — Handpicked AI Tools Directory" }}
+{{ else if $isFree }}
+  {{ $freeCount := add (len (where .Site.RegularPages "Params.price" "Free")) (len (where .Site.RegularPages "Params.price" "Freemium")) }}
+  {{ $pageTitle = printf "Top Free AI Tools (%d) — Best of AI" $freeCount }}
+{{ else if $isSubmit }}
+  {{ $pageTitle = "Submit Your AI Tool — Free AI Tool Directory Submission | Best of AI" }}
+{{ else if $isTool }}
+  {{ $cat := .Params.category_name | default "" }}
+  {{ $pageTitle = printf "%s — %s AI Tool | Best of AI" $name $cat }}
+{{ else if and .IsPage (eq .Section "categories") }}
+  {{ $count := len (where .Site.RegularPages "Params.category" .Params.slug) }}
+  {{ $pageTitle = printf "Best AI %s Tools (%d) — Best of AI" .Params.name $count }}
+{{ else if $isModelCategory }}
+  {{ if eq .Params.filter_field "runs_at_home" }}
+    {{ $pageTitle = printf "AI Models That Run at Home (%d) — Best of AI" $modelCatCount }}
+  {{ else }}
+    {{ $pageTitle = printf "Best %s AI Models (%d) — Best of AI" .Params.name $modelCatCount }}
+  {{ end }}
+{{ else if $isModel }}
+  {{ $pageTitle = printf "%s — %s AI Model | Best of AI" $name (.Params.model_type | default "AI") }}
+{{ else if $isHardware }}
+  {{ $hwTypeLabel := .Params.hardware_type | default "AI" }}
+  {{ $pageTitle = printf "%s — %s AI Hardware | Best of AI" $name $hwTypeLabel }}
+{{ else if $isCompany }}
+  {{ $companySlug := or .Params.slug .File.BaseFileName }}
+  {{ $companyCount := len (where .Site.RegularPages "Params.company" $companySlug) }}
+  {{ $pageTitle = printf "%s — AI Company (%d Tools) | Best of AI" $name $companyCount }}
+{{ else if and .IsPage $isJournal }}
+  {{ $pageTitle = printf "%s — The AI Journal | Best of AI" (.Params.title | default .Title) }}
+{{ else if and .IsPage (eq .Section "leaderboard") }}
+  {{ $pageTitle = printf "%s — Best of AI" (.Params.title | default .Title) }}
+{{ else if eq .Kind "section" }}
+  {{ if $isJournal }}
+    {{ $pageTitle = "The AI Journal — Best of AI" }}
+  {{ else if eq .Section "professionals" }}
+    {{ $pageTitle = "AI Tools by Profession — Best of AI" }}
+  {{ else if eq .Section "companies" }}
+    {{ $pageTitle = printf "Top AI Companies in the World (%d) — Best of AI" (len (where .Site.RegularPages "Section" "companies")) }}
+  {{ else if eq .Section "hardware" }}
+    {{ $pageTitle = printf "Top AI Hardware & GPUs (%d) — Best of AI" (len (where .Site.RegularPages "Section" "hardware")) }}
+  {{ else if eq .Section "models" }}
+    {{ $pageTitle = printf "Top AI Models & LLMs (%d) — Best of AI" (len (where .Site.RegularPages "Section" "models")) }}
+  {{ else if eq .Section "model-categories" }}
+    {{ $pageTitle = "AI Model Categories — Best of AI" }}
+  {{ else if eq .RelPermalink "/leaderboard/" }}
+    {{ $pageTitle = printf "Best AI Tools Leaderboard (Top %d, %s) — Best of AI" (len hugo.Data.leaderboard) .Params.period }}
+  {{ else }}
+    {{ $pageTitle = printf "%s — Best of AI" (.Title | default "Categories") }}
+  {{ end }}
+{{ else if and .IsPage (eq .Section "professionals") }}
+  {{ $profTitleCount := 0 }}
+  {{ $profTitleTools := where .Site.RegularPages "Section" "tools" }}
+  {{ range .Params.categories }}
+    {{ $profTitleCount = add $profTitleCount (len (where $profTitleTools "Params.category" .)) }}
+  {{ end }}
+  {{ $pageTitle = printf "Best AI Tools for %s (%d) — Best of AI" .Params.name $profTitleCount }}
+{{ else if eq .Kind "taxonomy" }}
+  {{ $pageTitle = "Browse AI Tools by Tag — Best of AI" }}
+{{ else if eq .Kind "term" }}
+  {{ $pageTitle = printf "#%s AI Tools — Best of AI" .Title }}
+{{ else if $is404 }}
+  {{ $pageTitle = "404 — Page Not Found | Best of AI" }}
+{{ else if $name }}
+  {{ $pageTitle = printf "%s — Best of AI" $name }}
+{{ else }}
+  {{ $pageTitle = "Best of AI" }}
+{{ end }}
+
+{{/* ── Meta description ── */}}
+{{ $desc := "" }}
+{{ if .IsHome }}
+  {{ $desc = .Site.Params.description }}
+{{ else if $isFree }}
+  {{ $freeDescCount := add (len (where .Site.RegularPages "Params.price" "Free")) (len (where .Site.RegularPages "Params.price" "Freemium")) }}
+  {{ $desc = printf "%d free and freemium AI tools, handpicked across writing, coding, image generation, and more. No credit card required." $freeDescCount }}
+{{ else if $isSubmit }}
+  {{ $desc = "Submit your AI tool to Best of AI and get listed under Professionals, on competitor alternative pages, in the newsletter, and on our GitHub awesome list — plus a real direct-follow backlink. Free, reviewed by hand." }}
+{{ else if $isTool }}
+  {{ $price    := .Params.price | default "" }}
+  {{ $cat      := .Params.category_name | default "AI" }}
+  {{ $toolDesc := .Params.description | default "" }}
+  {{ $desc = printf "%s is a %s %s tool. %s" $name $price $cat $toolDesc }}
+{{ else if and .IsPage (eq .Section "categories") }}
+  {{ $count   := len (where .Site.RegularPages "Params.category" .Params.slug) }}
+  {{ $catDesc := .Params.description | default "" }}
+  {{ if $catDesc }}
+    {{ $desc = printf "Browse %d best AI %s tools — %s" $count .Params.name $catDesc }}
+  {{ else }}
+    {{ $desc = printf "Discover %d handpicked AI %s tools, selected for quality and real-world impact." $count .Params.name }}
+  {{ end }}
+{{ else if $isModelCategory }}
+  {{ $mcDesc := .Params.description | default "" }}
+  {{ if eq .Params.filter_field "runs_at_home" }}
+    {{ $desc = printf "%d AI models you can download and run on your own hardware — open weights, no API required." $modelCatCount }}
+  {{ else }}
+    {{ $desc = printf "Browse %d best %s AI models — %s" $modelCatCount .Params.name $mcDesc }}
+  {{ end }}
+{{ else if $isModel }}
+  {{ $modelPrice   := .Params.price | default "" }}
+  {{ $modelType    := .Params.model_type | default "AI" }}
+  {{ $modelCompany := "" }}
+  {{ if .Params.company }}
+    {{ $modelCompanyMatch := where (where .Site.RegularPages "Section" "companies") "Params.slug" .Params.company }}
+    {{ if $modelCompanyMatch }}{{ $modelCompany = printf " from %s" (index $modelCompanyMatch 0).Params.name }}{{ end }}
+  {{ end }}
+  {{ $modelDesc := .Params.description | default .Params.subtitle | default "" }}
+  {{ $desc = printf "%s is a %s %s model%s. %s" $name $modelPrice $modelType $modelCompany $modelDesc }}
+{{ else if $isHardware }}
+  {{ $hwType     := .Params.hardware_type | default "AI" }}
+  {{ $hwSub      := .Params.subtitle | default .Params.description | default "" }}
+  {{ $hwFromBit  := "" }}
+  {{ if $hwManufacturerName }}{{ $hwFromBit = printf " from %s" $hwManufacturerName }}{{ end }}
+  {{ $hwSpecBits := slice }}
+  {{ if .Params.vram_gb }}{{ $hwSpecBits = $hwSpecBits | append (printf "%vGB %s" .Params.vram_gb (.Params.memory_type | default "VRAM")) }}{{ end }}
+  {{ if .Params.tdp_watts }}{{ $hwSpecBits = $hwSpecBits | append (printf "%vW TDP" .Params.tdp_watts) }}{{ end }}
+  {{ $hwSpecStr  := "" }}
+  {{ if $hwSpecBits }}{{ $hwSpecStr = printf " with %s" (delimit $hwSpecBits ", ") }}{{ end }}
+  {{ $desc = printf "%s is a %s AI accelerator%s%s. %s" $name $hwType $hwFromBit $hwSpecStr $hwSub }}
+{{ else if $isCompany }}
+  {{ $companySlug   := or .Params.slug .File.BaseFileName }}
+  {{ $companyCount  := len (where .Site.RegularPages "Params.company" $companySlug) }}
+  {{ $companyDesc   := .Params.description | default .Params.subtitle | default "" }}
+  {{ $desc = printf "%s — %d AI tools listed on Best of AI. %s" .Params.name $companyCount $companyDesc }}
+{{ else if and .IsPage $isJournal }}
+  {{ $desc = .Params.subtitle | default .Params.description | default .Site.Params.description }}
+{{ else if eq .Kind "section" }}
+  {{ if $isJournal }}
+    {{ $desc = .Params.description | default "Essays, guides, and notes on AI tools from the Best of AI team." }}
+  {{ else if eq .Section "professionals" }}
+    {{ $desc = printf "Find AI tools tailored to your role — %d profession guides with handpicked tools on Best of AI." (len .Pages) }}
+  {{ else if eq .Section "companies" }}
+    {{ $desc = printf "The top %d AI companies and labs in the world — ranked by tools featured on Best of AI." (len .Pages) }}
+  {{ else if eq .Section "hardware" }}
+    {{ $desc = printf "Browse %d AI GPUs and accelerators, with full specs — VRAM, memory bandwidth, TDP, and price — from the companies building them." (len .Pages) }}
+  {{ else if eq .Section "models" }}
+    {{ $desc = printf "Foundation models and LLMs, with specs and benchmarks, from the labs building them — %d models and counting." (len (where .Site.RegularPages "Section" "models")) }}
+  {{ else if eq .Section "model-categories" }}
+    {{ $desc = printf "Browse %d categories of AI models and LLMs — reasoning, code, image generation, and more." (len hugo.Data.model_categories) }}
+  {{ else if eq .RelPermalink "/leaderboard/" }}
+    {{ $desc = printf "The top %d best AI tools, ranked by real-world usefulness and impact — updated for %s. See how ChatGPT, Claude, Gemini, and more stack up." (len hugo.Data.leaderboard) .Params.period }}
+  {{ else }}
+    {{ $desc = printf "Browse all AI tool categories on Best of AI — %d categories of handpicked tools." (len hugo.Data.categories) }}
+  {{ end }}
+{{ else if and .IsPage (eq .Section "professionals") }}
+  {{ $profDescCount := 0 }}
+  {{ $profDescTools := where .Site.RegularPages "Section" "tools" }}
+  {{ range .Params.categories }}
+    {{ $profDescCount = add $profDescCount (len (where $profDescTools "Params.category" .)) }}
+  {{ end }}
+  {{ $profSub := .Params.subtitle | default "" }}
+  {{ if $profSub }}
+    {{ $desc = printf "%d AI tools for %s — %s" $profDescCount .Params.name $profSub }}
+  {{ else }}
+    {{ $desc = printf "Discover %d handpicked AI tools for %s — curated for quality and real-world impact on Best of AI." $profDescCount .Params.name }}
+  {{ end }}
+{{ else if eq .Kind "taxonomy" }}
+  {{ $desc = printf "Browse %d AI tool tags — explore tools by topic, use-case, and capability on Best of AI." (len .Data.Terms) }}
+{{ else if eq .Kind "term" }}
+  {{ $desc = printf "Discover the best AI tools tagged #%s — handpicked for quality and real-world impact on Best of AI." .Title }}
+{{ else if $is404 }}
+  {{ $desc = "The page you're looking for doesn't exist or may have been moved." }}
+{{ else if .Params.description }}
+  {{ $desc = .Params.description }}
+{{ else }}
+  {{ $desc = .Site.Params.description }}
+{{ end }}
+
+<title>{{ $pageTitle }}</title>
+<meta name="description" content="{{ $desc | truncate 155 }}">
+<link rel="canonical" href="{{ .Permalink }}">
+
+{{/* ── Keywords ── */}}
+{{ if $isFree }}
+<meta name="keywords" content="free AI tools, best free AI tools, top free AI tools, freemium AI tools, free artificial intelligence tools, AI tools free, free AI writing tools, free AI coding tools, free AI image generator, no credit card AI tools">
+{{ else if $isSubmit }}
+<meta name="keywords" content="submit ai tool, ai tool submission, list ai tool, ai directory submission, marketing ai tools, ai launch platform, promote ai startup, get ai tool listed, ai product launch, ai tool backlink, ai tool directory, submit startup">
+{{ else if $isTool }}
+{{ $kws := slice $name (.Params.category_name | default "") "AI" "artificial intelligence" }}
+{{ range .Params.tags }}{{ $kws = $kws | append . }}{{ end }}
+<meta name="keywords" content="{{ delimit $kws ", " }}">
+{{ else if and .IsPage (eq .Section "categories") }}
+<meta name="keywords" content="{{ .Params.name }}, AI {{ .Params.name }}, best AI {{ .Params.name }} tools, artificial intelligence {{ lower .Params.name }}">
+{{ else if $isModelCategory }}
+<meta name="keywords" content="{{ .Params.name }}, AI {{ .Params.name }} models, best {{ .Params.name }} AI models, {{ lower .Params.name }} LLMs">
+{{ else if $isModel }}
+{{ $mkws := slice $name (.Params.model_type | default "") "AI model" "LLM" }}
+{{ range .Params.tags }}{{ $mkws = $mkws | append . }}{{ end }}
+<meta name="keywords" content="{{ delimit $mkws ", " }}">
+{{ else if $isHardware }}
+{{ $hwKws := slice $name (.Params.hardware_type | default "") (.Params.architecture | default "") "AI hardware" "AI GPU" "AI accelerator" }}
+{{ if $hwManufacturerName }}{{ $hwKws = $hwKws | append $hwManufacturerName }}{{ $hwKws = $hwKws | append (printf "%s GPU" $hwManufacturerName) }}{{ end }}
+{{ range .Params.tags }}{{ $hwKws = $hwKws | append . }}{{ end }}
+<meta name="keywords" content="{{ delimit $hwKws ", " }}">
+{{ else if $isCompany }}
+{{ $ckws := slice .Params.name "AI company" (printf "%s AI" .Params.name) (printf "%s tools" .Params.name) }}
+{{ with .Params.headquarters }}{{ $ckws = $ckws | append . }}{{ end }}
+{{ range .Params.founders }}{{ $ckws = $ckws | append . }}{{ end }}
+<meta name="keywords" content="{{ delimit $ckws ", " }}">
+{{ else if and .IsPage $isJournal }}
+  {{ $journalKws := slice (.Params.title | default .Title) "The AI Journal" "AI journal" "AI tools" "open source" }}
+  {{ range .Params.related_categories }}{{ $journalKws = $journalKws | append . }}{{ end }}
+  {{ range .Params.related_tools }}{{ $journalKws = $journalKws | append (. | humanize) }}{{ end }}
+  {{ range .Params.related_professions }}{{ $journalKws = $journalKws | append (. | humanize) }}{{ end }}
+<meta name="keywords" content="{{ delimit $journalKws ", " }}">
+{{ else if and .IsPage (eq .Section "professionals") }}
+  {{ $profKws := slice (printf "AI for %s" .Params.name) (printf "best AI tools for %s" .Params.name) (printf "free AI tools for %s" .Params.name) (printf "AI %s tools" (lower .Params.name)) }}
+  {{ range .Params.categories }}
+    {{ $profKws = $profKws | append (printf "%s AI tools" (. | humanize | lower)) }}
+  {{ end }}
+<meta name="keywords" content="{{ delimit $profKws ", " }}">
+{{ else if and (eq .Kind "section") (eq .Section "hardware") }}
+<meta name="keywords" content="AI hardware, AI GPUs, GPU specs, AI accelerators, best AI GPUs, AI chips, GPU comparison, NVIDIA GPU, AMD GPU, TPU, datacenter GPU">
+{{ else if and (eq .Kind "section") (or (eq .Section "models") (eq .Section "model-categories")) }}
+<meta name="keywords" content="AI models, LLMs, foundation models, best AI models, open-weight models, AI model comparison, LLM leaderboard, AI model categories">
+{{ else if eq .RelPermalink "/leaderboard/" }}
+<meta name="keywords" content="best ai tools, ai tools leaderboard, top ai tools, best ai tools 2026, ai tool rankings, top rated ai tools, best ai apps, ai tools comparison">
+{{ else if .Params.keywords }}
+<meta name="keywords" content="{{ delimit .Params.keywords ", " }}">
+{{ end }}
+
+{{/* ── Open Graph ── */}}
+{{ $ogImage := $ogImageDefault }}
+{{ $ogUseDefaultImg := true }}
+{{ if and (or $isTool $isCompany $isHardware) .Params.logo_url }}
+  {{ $ogImage = .Params.logo_url }}
+  {{ $ogUseDefaultImg = false }}
+{{ end }}
+<meta property="og:title"       content="{{ $pageTitle }}">
+<meta property="og:description" content="{{ $desc | truncate 155 }}">
+<meta property="og:url"         content="{{ .Permalink }}">
+<meta property="og:type"        content="{{ if and .IsPage $isJournal }}article{{ else }}website{{ end }}">
+<meta property="og:site_name"   content="Best of AI">
+<meta property="og:image"       content="{{ $ogImage }}">
+<meta property="og:image:alt"   content="{{ $pageTitle }}">
+{{ if $ogUseDefaultImg }}
+<meta property="og:image:width"  content="1366">
+<meta property="og:image:height" content="768">
+{{ end }}
+<meta property="og:locale"      content="en_US">
+{{ if and .IsPage $isJournal }}
+{{ if not .Date.IsZero }}<meta property="article:published_time" content="{{ .Date.Format "2006-01-02T15:04:05Z07:00" }}">{{ end }}
+{{ if not .Lastmod.IsZero }}<meta property="article:modified_time" content="{{ .Lastmod.Format "2006-01-02T15:04:05Z07:00" }}">{{ end }}
+<meta property="article:section" content="The AI Journal">
+{{ range .Params.related_categories }}<meta property="article:tag" content="{{ . | humanize }}">{{ end }}
+{{ with .Params.author.name }}<meta property="article:author" content="{{ . }}">{{ end }}
+<link rel="alternate" type="application/rss+xml" title="The AI Journal" href="{{ "/journal/index.xml" | absURL }}">
+{{ end }}
+
+{{/* ── Twitter Card ── */}}
+<meta name="twitter:card"        content="summary_large_image">
+<meta name="twitter:title"       content="{{ $pageTitle }}">
+<meta name="twitter:description" content="{{ $desc | truncate 155 }}">
+<meta name="twitter:image"       content="{{ $ogImage }}">
+<meta name="twitter:image:alt"   content="{{ $pageTitle }}">
+
+{{/* ── RSS ── */}}
+{{ with .OutputFormats.Get "RSS" }}
+<link rel="alternate" type="application/rss+xml" title="{{ $.Site.Title }}" href="{{ .Permalink }}">
+{{ end }}
+
+{{/* ── Structured data ── */}}
+{{ partial "seo-jsonld.html" . }}
+
+<!-- Theme -->
+<meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<!-- Styles -->
+<link rel="preload" href="{{ "css/main.css" | relURL }}" as="style">
+<link rel="stylesheet" href="{{ "css/main.css" | relURL }}">
+
+<!-- Saved tools -->
+<script defer src="{{ "js/saved.js" | relURL }}"></script>
+
+<!-- Favicon -->
+<link rel="icon" type="image/png" href="{{ "favicon/favicon-96x96.png" | relURL }}" sizes="96x96">
+<link rel="icon" type="image/svg+xml" href="{{ "favicon/favicon.svg" | relURL }}">
+<link rel="shortcut icon" href="{{ "favicon/favicon.ico" | relURL }}">
+<link rel="apple-touch-icon" sizes="180x180" href="{{ "favicon/apple-touch-icon.png" | relURL }}">
+<meta name="apple-mobile-web-app-title" content="Best of AI">
+<link rel="manifest" href="{{ "favicon/site.webmanifest" | relURL }}">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-PPGWB73NX6"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-PPGWB73NX6');
+</script>

@@ -1,0 +1,6 @@
+{{ define "main" }}
+{{ $allModels := where .Site.RegularPages "Section" "models" }}
+{{ $allModels = sort $allModels "Params.release_date" "desc" }}
+
+{{ partial "models-page.html" (dict "page" . "allModels" $allModels "tableModels" $allModels "activeSlug" "all" "activeName" "Models") }}
+{{ end }}

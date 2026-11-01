@@ -1,0 +1,66 @@
+baseURL = "https://bestofai.io/"
+locale = "en-US"
+title = "Best of AI"
+enableRobotsTXT = true
+disableKinds = ["sitemap"]
+
+[params]
+  description = "Handpicked AI tools — no fluff, no mediocre apps. Every tool carefully selected for quality, innovation, and real-world impact."
+  githubOrg   = "https://github.com/ai-for-developers"
+  githubRepo  = "https://github.com/best-of-ai/best-of-ai"
+  siteURL     = "https://bestofai.io"
+
+[outputs]
+  home = ["HTML", "JSON", "SitemapIndex", "SitemapTools", "SitemapHardware", "SitemapModels", "SitemapSkills", "SitemapPages"]
+
+[mediaTypes]
+  [mediaTypes."application/json"]
+    suffixes = ["json"]
+
+[outputFormats]
+  [outputFormats.JSON]
+    mediaType = "application/json"
+    baseName  = "index"
+    isPlainText = true
+    notAlternative = true
+  [outputFormats.SitemapIndex]
+    mediaType = "application/xml"
+    baseName  = "sitemap"
+    isPlainText = true
+    notAlternative = true
+  [outputFormats.SitemapTools]
+    mediaType = "application/xml"
+    baseName  = "sitemap-tools"
+    isPlainText = true
+    notAlternative = true
+  [outputFormats.SitemapHardware]
+    mediaType = "application/xml"
+    baseName  = "sitemap-hardware"
+    isPlainText = true
+    notAlternative = true
+  [outputFormats.SitemapModels]
+    mediaType = "application/xml"
+    baseName  = "sitemap-models"
+    isPlainText = true
+    notAlternative = true
+  [outputFormats.SitemapSkills]
+    mediaType = "application/xml"
+    baseName  = "sitemap-skills"
+    isPlainText = true
+    notAlternative = true
+  [outputFormats.SitemapPages]
+    mediaType = "application/xml"
+    baseName  = "sitemap-pages"
+    isPlainText = true
+    notAlternative = true
+
+[permalinks]
+  model-categories = "/models/category/:slug/"
+  skill-categories = "/skills/category/:slug/"
+
+[taxonomies]
+  tag = "tags"
+
+[markup]
+  [markup.goldmark.renderer]
+    unsafe = true
